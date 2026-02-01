@@ -1,0 +1,21 @@
+// Firebase Storage Rules
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Allow read access for everyone (to view uploaded images)
+      allow read: if true;
+      // Allow write access for authenticated users
+      allow write: if request.auth != null;
+    }
+  }
+  
+  // Allow authenticated users to upload to specific folders
+  match /b/{bucket}/o/vehicle_images/{imageId} {
+    allow read, write: if request.auth != null;
+  }
+  
+  match /b/{bucket}/o/rc_books/{imageId} {
+    allow read, write: if request.auth != null;
+  }
+}
