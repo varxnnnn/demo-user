@@ -34,13 +34,13 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   final ImagePicker _picker = ImagePicker();
 
   String _generateStoragePath(String folder) {
-    String uuid = _generateUUID();
+    final uuid = _generateUUID();
     if (folder == 'vehicle_images') {
-      return 'vehicle/\$uuid';
+      return 'vehicle/$uuid';
     } else if (folder == 'rc_books') {
-      return 'rc_book/\$uuid';
+      return 'rc_book/$uuid';
     } else {
-      return '\$folder/\$uuid';
+      return '$folder/$uuid';
     }
   }
   
@@ -106,9 +106,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       // Wait a moment to ensure authentication is ready
       await Future.delayed(const Duration(milliseconds: 500));
       
-      String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
       String storagePath = _generateStoragePath(folder);
-      Reference ref = FirebaseStorage.instance.ref().child(storagePath + '/\$fileName');
+      Reference ref = FirebaseStorage.instance.ref().child(storagePath);
       
       UploadTask uploadTask = ref.putFile(imageFile);
       TaskSnapshot snapshot = await uploadTask;

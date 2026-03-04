@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../lib/models/vehicle_capacity.dart';
 import '../lib/services/capacity_service.dart';
 

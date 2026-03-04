@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 // providers
 import 'providers/user_provider.dart';
 import 'providers/location_provider.dart';
+import 'providers/trips_provider.dart';
 
 // screens
 import 'screens/splash_screen.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()), // ✅ REQUIRED
+        ChangeNotifierProvider(create: (_) => TripsProvider()),
       ],
       child: const MyApp(),
     ),

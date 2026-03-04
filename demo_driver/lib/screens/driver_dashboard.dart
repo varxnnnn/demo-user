@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/capacity_provider.dart';
-import '../models/vehicle_capacity.dart';
 
 class DriverDashboard extends StatefulWidget {
   static const String id = 'driver_dashboard';

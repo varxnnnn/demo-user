@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 
 class CreateRideScreen extends StatefulWidget {
   const CreateRideScreen({super.key});
@@ -285,20 +284,6 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    // Create ride request (in real app, this would save to Firestore)
-    final rideRequest = {
-      'id': const Uuid().v4(),
-      'userId': 'user_123', // Would get from auth
-      'userName': 'Test User',
-      'userRating': 4.5,
-      'pickupLocation': _pickupController.text.trim(),
-      'dropoffLocation': _dropoffController.text.trim(),
-      'offeredPrice': double.tryParse(_priceController.text) ?? 100.0,
-      'urgency': _urgency,
-      'requestedAt': DateTime.now().millisecondsSinceEpoch,
-      'status': 'pending',
-    };
 
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(

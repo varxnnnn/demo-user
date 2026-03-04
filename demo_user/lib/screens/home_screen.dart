@@ -18,15 +18,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ignore: unused_field
+  bool _isBookingTrip = false;
+  // ignore: unused_field
+  Trip? _currentTrip;
   final TextEditingController _destinationController = TextEditingController();
-  final LocationService _locationService = LocationService();
   final TripService _tripService = TripService();
   
   // Trip booking state
-  bool _isBookingTrip = false;
   String? _currentTripId;
   Stream<Trip>? _tripStream;
-  Trip? _currentTrip;
   
   @override
   void initState() {
@@ -520,35 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  void _showBookingConfirmationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Ride Requested'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Your ride has been booked successfully.'),
-              const SizedBox(height: 10),
-              Text('From: ${Provider.of<LocationProvider>(context, listen: false).pickupLocation}'),
-              Text('To: ${Provider.of<LocationProvider>(context, listen: false).destination}'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
   
   void _selectQuickDestination(String destination) {
     final locationProvider = Provider.of<LocationProvider>(context, listen: false);
@@ -816,24 +788,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  String _getStatusDisplayText(String status) {
-    switch (status) {
-      case 'requested':
-        return 'Searching for drivers';
-      case 'accepted':
-        return 'Driver accepted';
-      case 'driver_arrived':
-        return 'Driver arrived';
-      case 'in_progress':
-        return 'In trip';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
+  
   
   Color _getStatusColor(String status) {
     switch (status) {

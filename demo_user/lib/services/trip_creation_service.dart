@@ -33,12 +33,34 @@ class TripCreationService {
         createdAt: DateTime.now(),
       );
 
-      // Save to Firestore
+      // Save trip to Firestore
       final docRef = await _firestore.collection('trips').add(trip.toJson());
       
       // Update the trip with the generated ID
       await _firestore.collection('trips').doc(docRef.id).update({
         'id': docRef.id,
+      });
+
+      // Also create a ride request that the driver app can see
+      await _firestore.collection('rideRequests').doc(docRef.id).set({
+        'id': docRef.id,
+        'userId': userId,
+        'userName': userName,
+        'userRating': 4.5, // Default rating
+        'pickupLocation': pickupLocation.formattedAddress,
+        'dropoffLocation': dropoffLocation.formattedAddress,
+        'pickupLat': pickupLocation.latitude,
+        'pickupLng': pickupLocation.longitude,
+        'dropoffLat': dropoffLocation.latitude,
+        'dropoffLng': dropoffLocation.longitude,
+        'distance': distance,
+        'offeredPrice': fare,
+        'urgency': 'medium',
+        'requestedAt': DateTime.now().millisecondsSinceEpoch,
+        'status': 'pending',
+        'driverId': null, // Unassigned initially
+        'negotiatedPrice': null,
+        'tripId': docRef.id,
       });
 
       return docRef.id;

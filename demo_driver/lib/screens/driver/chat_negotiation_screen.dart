@@ -14,11 +14,12 @@ class ChatNegotiationScreen extends StatefulWidget {
 }
 
 class _ChatNegotiationScreenState extends State<ChatNegotiationScreen> {
+  // ignore: unused_field
+  bool _isLoading = false;
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
   
   List<ChatMessage> _messages = [];
-  bool _isLoading = false;
 
   @override
   void initState() {

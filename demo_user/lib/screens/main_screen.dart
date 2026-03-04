@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/location_provider.dart';
 import 'simple_ride_tab.dart';
 import 'all_services_tab.dart';
 import 'profile_tab.dart';
+import 'history_tab.dart';
 
 class MainScreen extends StatefulWidget {
   static const String id = 'main_screen';
@@ -20,6 +19,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _tabs = [
     const SimpleRideTab(),
     const AllServicesTab(),
+    const HistoryTab(),
     const ProfileTab(),
   ];
 
@@ -46,6 +46,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.category),
             label: 'Services',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'History',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

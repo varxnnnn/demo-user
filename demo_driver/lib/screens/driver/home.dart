@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/ride_request_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_ride_request.dart';
-import 'create_ride_screen.dart';
 import 'chat_negotiation_screen.dart';
+import 'driver_map_view.dart';
+import 'driver_trip_details_screen.dart';
+import 'verification_entry_screen.dart';
+import '../../models/trip.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,7 +19,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isOnline = false;
+  // ignore: unused_field
   bool _hasActiveTrip = false;
+  // ignore: unused_field
   String _currentTripStatus = 'waiting';
   
   // Ride requests
@@ -26,7 +32,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _checkCurrentDriverStatus();
     _initializeRideRequests();
+  }
+  
+  void _checkCurrentDriverStatus() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final driverId = authService.currentUser?.uid;
+    
+    if (driverId != null) {
+      try {
+        final driverDoc = await FirebaseFirestore.instance
+            .collection('drivers')
+            .doc(driverId)
+            .get();
+            
+        if (driverDoc.exists) {
+          final status = driverDoc.data()?['onlineStatus'] ?? 'offline';
+          setState(() {
+            _isOnline = status == 'online';
+          });
+        }
+      } catch (e) {
+        print('Error fetching driver status: $e');
+      }
+    }
   }
 
   @override
@@ -72,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Update driver status in Firestore
       authService.saveDriverData(driverId, {
         'onlineStatus': 'online',
-        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -85,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Update driver status in Firestore
       authService.saveDriverData(driverId, {
         'onlineStatus': 'offline',
-        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -183,80 +213,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildOnlineView() {
     return Column(
       children: [
-        // Status Header
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  // Online Status
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.circle, color: Colors.green, size: 12),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Online',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // Stats
-                  Row(
-                    children: [
-                      _buildStatCard('Today', '12', '₹2,450', Icons.directions_car),
-                      _buildStatCard('Week', '45', '₹8,900', Icons.calendar_today),
-                      _buildStatCard('Rating', '4.8', '⭐ 4.8', Icons.star),
-                    ],
-                  ),
-                  
-                  // Go Offline Button
-                  ElevatedButton.icon(
-                    onPressed: _toggleOnlineStatus,
-                    icon: const Icon(Icons.power_off),
-                    label: const Text('Go Offline'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[50],
-                      foregroundColor: Colors.red,
-                      side: BorderSide(color: Colors.red),
-                      minimumSize: const Size(120, 36),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Tabs
+        // Tabs at the top
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300),
+            ),
           ),
           child: Column(
             children: [
@@ -274,20 +237,122 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-
-              // Tab Content
-              SizedBox(
-                height: 400,
-                child: _activeTab == 0
-                    ? _buildAvailableRides()
-                    : _activeTab == 1
-                        ? _buildActiveRides()
-                        : _buildCompletedRides(),
+            ],
+          ),
+        ),
+        
+        // Content area for each tab
+        Expanded(
+          child: _activeTab == 0
+              ? _buildAvailableContent()  // Map + available rides
+              : _activeTab == 1
+                  ? _buildActiveContent()   // Active rides
+                  : _buildCompletedContent(), // Completed rides
+        ),
+      ],
+    );
+  }
+  
+  // Build content for Available tab (Map + Available Rides)
+  Widget _buildAvailableContent() {
+    return Column(
+      children: [
+        // Status bar with online indicator and offline button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Online Status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, color: Colors.green, size: 12),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Online',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const Spacer(),
+              
+              // Go Offline Button
+              ElevatedButton.icon(
+                onPressed: _toggleOnlineStatus,
+                icon: const Icon(Icons.power_off),
+                label: const Text('Go Offline'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[50],
+                  foregroundColor: Colors.red,
+                  side: BorderSide(color: Colors.red),
+                  minimumSize: const Size(120, 36),
+                ),
               ),
             ],
           ),
         ),
+        
+        // Map View showing driver location - Takes half the screen
+        Expanded(
+          flex: 1,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey),
+            ),
+            child: const DriverMapView(),
+          ),
+        ),
+        
+        // Available rides list below map - Takes the other half
+        Expanded(
+          flex: 1,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+            child: _buildAvailableRides(),
+          ),
+        ),
       ],
+    );
+  }
+  
+  // Build content for Active tab
+  Widget _buildActiveContent() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: _buildActiveRides(),
+    );
+  }
+  
+  // Build content for Completed tab
+  Widget _buildCompletedContent() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: _buildCompletedRides(),
     );
   }
 
@@ -330,36 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, String subtitle, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.grey[600], size: 20),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6A1B9A),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildAvailableRides() {
     if (_rideRequests.isEmpty) {
@@ -377,7 +413,252 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActiveRides() {
-    return _buildEmptyState('No active trips', Icons.navigation);
+    final driverId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+    
+    if (driverId == null) {
+      return _buildEmptyState('No active trips', Icons.navigation);
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .collection('activeTrips')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('No active trips', Icons.navigation);
+        }
+
+        final activeTrips = snapshot.data!.docs;
+
+        return ListView.builder(
+          itemCount: activeTrips.length,
+          itemBuilder: (context, index) {
+            final tripData = activeTrips[index].data() as Map<String, dynamic>;
+            return _buildActiveRideCard(
+              tripId: tripData['tripId'],
+              userName: tripData['userName'],
+              pickupLocation: tripData['pickupLocation'],
+              dropoffLocation: tripData['dropoffLocation'],
+              status: tripData['status'],
+              offeredPrice: tripData['offeredPrice'],
+              pickupLat: (tripData['pickupLat'] as num?)?.toDouble(),
+              pickupLng: (tripData['pickupLng'] as num?)?.toDouble(),
+              dropoffLat: (tripData['dropoffLat'] as num?)?.toDouble(),
+              dropoffLng: (tripData['dropoffLng'] as num?)?.toDouble(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveRideCard({
+    required String tripId,
+    required String userName,
+    required String pickupLocation,
+    required String dropoffLocation,
+    required String status,
+    required double offeredPrice,
+    double? pickupLat,
+    double? pickupLng,
+    double? dropoffLat,
+    double? dropoffLng,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // User Info Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: const Color(0xFF6A1B9A),
+                  child: Text(
+                    userName.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Locations
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow(Icons.location_on, 'PICKUP', pickupLocation),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.location_on, 'DROPOFF', dropoffLocation),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.currency_rupee, 'FARE', '₹${offeredPrice.toStringAsFixed(0)}'),
+              ],
+            ),
+          ),
+
+          // Action Buttons
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Verify Button (shown when driver is at pickup)
+                if (status == 'en_route' || status == 'arrived_at_pickup')
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        // Show verification screen
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VerificationEntryScreen(
+                              tripId: tripId,
+                              userName: userName,
+                              pickupLocation: pickupLocation,
+                            ),
+                          ),
+                        );
+
+                        if (result == true && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Ride in progress! Head to destination'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.verified_user),
+                      label: const Text('VERIFY'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                // Navigate Button (shown for all statuses)
+                if (status != 'arrived_at_pickup')
+                  const SizedBox(width: 12),
+                if (status != 'arrived_at_pickup')
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Navigate to trip details screen
+                        final trip = Trip(
+                          id: tripId,
+                          userId: '', // Will be populated from Firestore
+                          userName: userName,
+                          pickupLocation: pickupLocation,
+                          dropoffLocation: dropoffLocation,
+                          pickupLat: pickupLat ?? 0.0,
+                          pickupLng: pickupLng ?? 0.0,
+                          dropoffLat: dropoffLat ?? 0.0,
+                          dropoffLng: dropoffLng ?? 0.0,
+                          fare: offeredPrice,
+                          status: status,
+                          createdAt: null,
+                          driverId: '', // Will be populated from Firestore
+                          driverName: '', // Will be populated from Firestore
+                          driverPhone: '', // Will be populated from Firestore
+                          vehicleNumber: '', // Will be populated from Firestore
+                          estimatedArrivalTime: null, // Will be populated from Firestore
+                          acceptedAt: null, // Will be populated from Firestore
+                          driverArrivedAt: null, // Will be populated from Firestore
+                          startedAt: null, // Will be populated from Firestore
+                          completedAt: null, // Will be populated from Firestore
+                          cancelledAt: null, // Will be populated from Firestore
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DriverTripDetailsScreen(trip: trip),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.directions_car),
+                      label: const Text('NAVIGATE'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCompletedRides() {
@@ -638,12 +919,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _acceptRide(UserRideRequest request) async {
     try {
-      final rideRequestService = RideRequestService();
-      await rideRequestService.acceptRideRequest(request.id, _getDriverId());
+      // Get driver name from auth service
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final driverName = authService.currentUser?.displayName ?? 'Driver';
       
+      final rideRequestService = RideRequestService();
+      await rideRequestService.acceptRideRequest(request.id, _getDriverId(), driverName);
+      
+      // Add to driver's active trips in Firestore
+      final driverId = _getDriverId();
+      final currentAuthService = Provider.of<AuthService>(context, listen: false);
+      final currentDriverName = currentAuthService.currentUser?.displayName ?? 'Driver';
+      
+      await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .collection('activeTrips')
+          .doc(request.id)
+          .set({
+        'tripId': request.id,
+        'userId': request.userId,
+        'userName': request.userName,
+        'pickupLocation': request.pickupLocation,
+        'dropoffLocation': request.dropoffLocation,
+        'pickupLat': request.pickupLat ?? 0.0,
+        'pickupLng': request.pickupLng ?? 0.0,
+        'dropoffLat': request.dropoffLat ?? 0.0,
+        'dropoffLng': request.dropoffLng ?? 0.0,
+        'distance': request.distance,
+        'offeredPrice': request.offeredPrice,
+        'status': 'en_route',
+        'requestedAt': request.requestedAt.millisecondsSinceEpoch,
+        'acceptedAt': FieldValue.serverTimestamp(),
+        'driverId': driverId,
+        'driverName': currentDriverName,
+      });
+
       setState(() {
         _rideRequests.remove(request);
         _hasActiveTrip = true;
+        _activeTab = 1; // Switch to active tab
       });
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -701,5 +1016,15 @@ class _HomeScreenState extends State<HomeScreen> {
   String _getDriverId() {
     final authService = Provider.of<AuthService>(context, listen: false);
     return authService.currentUser?.uid ?? '';
+  }
+
+  void _openNavigationToLocation(double lat, double lng) {
+    // This would typically open Google Maps or another navigation app
+    // For now, we'll just show a snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Navigating to $lat, $lng'),
+      ),
+    );
   }
 }

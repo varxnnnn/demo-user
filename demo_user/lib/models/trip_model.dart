@@ -57,30 +57,89 @@ class Trip {
   }
 
   factory Trip.fromJson(Map<String, dynamic> json) {
+    // Handle both old format (string pickupLocation) and new format (Map pickupLocation)
+    Location pickupLocation;
+    if (json['pickupLocation'] is String) {
+      // Old format: pickupLocation is a string
+      pickupLocation = Location(
+        latitude: json['pickupLat']?.toDouble() ?? 0.0,
+        longitude: json['pickupLng']?.toDouble() ?? 0.0,
+        formattedAddress: json['pickupLocation'] as String,
+        placeId: 'old_pickup_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    } else {
+      // New format: pickupLocation is a Map
+      pickupLocation = Location.fromJson(json['pickupLocation']);
+    }
+
+    // Handle both old format (string dropoffLocation) and new format (Map dropoffLocation)
+    Location dropoffLocation;
+    if (json['dropoffLocation'] is String) {
+      // Old format: dropoffLocation is a string
+      dropoffLocation = Location(
+        latitude: json['dropoffLat']?.toDouble() ?? 0.0,
+        longitude: json['dropoffLng']?.toDouble() ?? 0.0,
+        formattedAddress: json['dropoffLocation'] as String,
+        placeId: 'old_dropoff_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    } else {
+      // New format: dropoffLocation is a Map
+      dropoffLocation = Location.fromJson(json['dropoffLocation']);
+    }
+
+    // Handle createdAt - could be Timestamp or milliseconds
+    DateTime createdAt;
+    if (json['createdAt'] is int) {
+      createdAt = DateTime.fromMillisecondsSinceEpoch(json['createdAt']);
+    } else {
+      // Firestore Timestamp - convert to DateTime
+      try {
+        final timestamp = json['createdAt'];
+        if (timestamp.runtimeType.toString() == '_DocumentTimestamp') {
+          createdAt = timestamp.toDate();
+        } else {
+          // Fallback
+          createdAt = DateTime.now();
+        }
+      } catch (e) {
+        createdAt = DateTime.now();
+      }
+    }
+
     return Trip(
       id: json['id'],
       userId: json['userId'],
       userName: json['userName'],
-      pickupLocation: Location.fromJson(json['pickupLocation']),
-      dropoffLocation: Location.fromJson(json['dropoffLocation']),
-      tripType: TripType.values.firstWhere(
-        (e) => e.toString().split('.').last == json['tripType'],
-      ),
-      transportDetails: TransportDetails.fromJson(json['transportDetails']),
+      pickupLocation: pickupLocation,
+      dropoffLocation: dropoffLocation,
+      tripType: json['tripType'] != null
+          ? TripType.values.firstWhere(
+              (e) => e.toString().split('.').last == json['tripType'],
+            )
+          : TripType.objectTransport,
+      transportDetails: json['transportDetails'] != null
+          ? TransportDetails.fromJson(json['transportDetails'])
+          : TransportDetails(),
       distance: json['distance']?.toDouble() ?? 0.0,
       estimatedDuration: json['estimatedDuration'] ?? 0,
       fare: json['fare']?.toDouble() ?? 0.0,
-      status: TripStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == json['status'],
-      ),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt']),
+      status: json['status'] != null
+          ? TripStatus.values.firstWhere(
+              (e) => e.toString().split('.').last == json['status'],
+            )
+          : TripStatus.requested,
+      createdAt: createdAt,
       driverId: json['driverId'],
       driverName: json['driverName'],
       acceptedAt: json['acceptedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['acceptedAt'])
+          ? (json['acceptedAt'] is int
+              ? DateTime.fromMillisecondsSinceEpoch(json['acceptedAt'])
+              : json['acceptedAt'].toDate())
           : null,
       completedAt: json['completedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['completedAt'])
+          ? (json['completedAt'] is int
+              ? DateTime.fromMillisecondsSinceEpoch(json['completedAt'])
+              : json['completedAt'].toDate())
           : null,
     );
   }

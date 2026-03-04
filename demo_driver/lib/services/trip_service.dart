@@ -39,7 +39,7 @@ class TripService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .map((doc) => Trip.fromJson(doc.data() as Map<String, dynamic>))
+          .map((doc) => Trip.fromJson(doc.data()))
           .toList();
     });
   }
@@ -51,22 +51,28 @@ class TripService {
     return [
       Trip(
         id: 'trip1',
-        driverId: '',
         userId: 'user1',
         userName: 'John Doe',
         pickupLocation: 'Central Market',
         dropoffLocation: 'City Mall',
+        pickupLat: 17.3850,
+        pickupLng: 78.4867,
+        dropoffLat: 17.4000,
+        dropoffLng: 78.5000,
         fare: 150.0,
         status: 'requested',
         createdAt: DateTime.now(),
       ),
       Trip(
         id: 'trip2',
-        driverId: '',
         userId: 'user2',
         userName: 'Jane Smith',
         pickupLocation: 'Railway Station',
         dropoffLocation: 'Airport',
+        pickupLat: 17.3950,
+        pickupLng: 78.4967,
+        dropoffLat: 17.4100,
+        dropoffLng: 78.5100,
         fare: 120.0,
         status: 'requested',
         createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
@@ -125,7 +131,7 @@ class TripService {
         .snapshots() // Remove limit for better real-time experience
         .map((snapshot) {
           return snapshot.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
+            final data = doc.data();
             data['id'] = doc.id; // Add document ID
             return UserRideRequest.fromJson(data);
           }).toList();
@@ -162,6 +168,78 @@ class TripService {
       await _firestore.collection('trips').doc(tripId).update({
         'status': 'cancelled',
         'completedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Get active pooled ride for driver
+  Future<Map<String, dynamic>?> getActivePooledRideForDriver(String driverId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('pooledRideGroups')
+          .where('driverId', isEqualTo: driverId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+      return snapshot.docs.first.data();
+    } catch (e) {
+      print('Error getting active pool: $e');
+      return null;
+    }
+  }
+
+  // Get pools for driver (stream of active pools)
+  Stream<List<Map<String, dynamic>>> getDriverPoolsStream(String driverId) {
+    return _firestore
+        .collection('pooledRideGroups')
+        .where('driverId', isEqualTo: driverId)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  // Get trips in a pooling group
+  Future<List<Trip>> getTripsInPool(String poolingKey) async {
+    try {
+      final poolDoc = await _firestore
+          .collection('pooledRideGroups')
+          .doc(poolingKey)
+          .get();
+
+      if (!poolDoc.exists) return [];
+
+      final tripIds = List<String>.from(poolDoc.data()?['tripIds'] ?? []);
+      final trips = <Trip>[];
+
+      for (final tripId in tripIds) {
+        final tripDoc = await _firestore.collection('trips').doc(tripId).get();
+        if (tripDoc.exists) {
+          trips.add(Trip.fromJson({'id': tripId, ...tripDoc.data() as Map<String, dynamic>}));
+        }
+      }
+
+      return trips;
+    } catch (e) {
+      print('Error getting trips in pool: $e');
+      return [];
+    }
+  }
+
+  // Update trip with pooling info
+  Future<void> updateTripPoolingInfo({
+    required String tripId,
+    required String poolingKey,
+    required double pooledFare,
+  }) async {
+    try {
+      await _firestore.collection('trips').doc(tripId).update({
+        'poolingKey': poolingKey,
+        'isPooled': true,
+        'pooledFare': pooledFare,
       });
     } catch (e) {
       rethrow;

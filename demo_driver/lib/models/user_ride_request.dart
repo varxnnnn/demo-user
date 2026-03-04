@@ -12,6 +12,10 @@ class UserRideRequest {
   final String status; // pending, accepted, rejected, negotiating, completed
   final String? driverId;
   final double? negotiatedPrice;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
 
   UserRideRequest({
     required this.id,
@@ -27,6 +31,10 @@ class UserRideRequest {
     this.status = 'pending',
     this.driverId,
     this.negotiatedPrice,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropoffLat,
+    this.dropoffLng,
   });
 
   // Create a ride request from a Map
@@ -47,6 +55,10 @@ class UserRideRequest {
       status: json['status'] ?? 'pending',
       driverId: json['driverId'],
       negotiatedPrice: json['negotiatedPrice']?.toDouble(),
+      pickupLat: json['pickupLat']?.toDouble(),
+      pickupLng: json['pickupLng']?.toDouble(),
+      dropoffLat: json['dropoffLat']?.toDouble(),
+      dropoffLng: json['dropoffLng']?.toDouble(),
     );
   }
 
@@ -66,6 +78,10 @@ class UserRideRequest {
       'status': status,
       'driverId': driverId,
       'negotiatedPrice': negotiatedPrice,
+      'pickupLat': pickupLat,
+      'pickupLng': pickupLng,
+      'dropoffLat': dropoffLat,
+      'dropoffLng': dropoffLng,
     };
   }
 
@@ -74,6 +90,10 @@ class UserRideRequest {
     String? status,
     String? driverId,
     double? negotiatedPrice,
+    double? pickupLat,
+    double? pickupLng,
+    double? dropoffLat,
+    double? dropoffLng,
   }) {
     return UserRideRequest(
       id: this.id,
@@ -89,6 +109,10 @@ class UserRideRequest {
       status: status ?? this.status,
       driverId: driverId ?? this.driverId,
       negotiatedPrice: negotiatedPrice ?? this.negotiatedPrice,
+      pickupLat: pickupLat ?? this.pickupLat,
+      pickupLng: pickupLng ?? this.pickupLng,
+      dropoffLat: dropoffLat ?? this.dropoffLat,
+      dropoffLng: dropoffLng ?? this.dropoffLng,
     );
   }
 }

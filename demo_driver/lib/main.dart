@@ -7,7 +7,6 @@ import 'services/vehicle_service.dart';
 import 'services/trip_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/driver/dashboard.dart';
-import 'screens/capacity_setup.dart';
 import 'providers/capacity_provider.dart';
 
 Future<void> main() async {

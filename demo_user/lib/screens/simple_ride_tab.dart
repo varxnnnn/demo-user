@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import '../providers/location_provider.dart';
 import '../services/location_service.dart';
-import '../models/trip_model.dart';
-import 'book_ride_screen.dart';
+import 'trip_creation_screen.dart';
 import 'address_search_screen.dart';
-import '../widgets/address_search.dart';
 
 class SimpleRideTab extends StatefulWidget {
   const SimpleRideTab({Key? key}) : super(key: key);
@@ -21,9 +18,6 @@ class _SimpleRideTabState extends State<SimpleRideTab> {
   late GoogleMapController mapController;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
-  final TextEditingController _searchController = TextEditingController();
-  bool _showSuggestions = false;
-  List<PlacePrediction> _suggestions = [];
   
   // Ride type selection
   bool _isCurrentRide = true; // true for current ride, false for scheduled ride
@@ -345,94 +339,19 @@ class _SimpleRideTabState extends State<SimpleRideTab> {
   }
   
   void _bookRide() {
-    if (_isCurrentRide) {
-      // For current ride, check driver availability
-      _checkDriverAvailability();
-    } else {
-      // For scheduled ride, show confirmation
-      _confirmScheduledRide();
-    }
-  }
-  
-  void _checkDriverAvailability() {
-    // Simulate checking driver availability
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Checking driver availability...'),
-        backgroundColor: Colors.blue,
-      ),
-    );
-    
-    // Simulate API call delay
-    Future.delayed(const Duration(seconds: 2), () {
-      // Randomly determine if driver is available (80% chance)
-      bool isAvailable = math.Random().nextDouble() > 0.2;
-      
-      if (isAvailable && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Driver found! Ride initiated.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Navigate to booking screen
-        Navigator.pushNamed(context, BookRideScreen.id);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No drivers available right now. Please try again in a few minutes.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    });
-  }
-  
-  void _confirmScheduledRide() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Confirm Scheduled Ride'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Pickup: ${Provider.of<LocationProvider>(context, listen: false).pickupLocation}'),
-              Text('Destination: ${Provider.of<LocationProvider>(context, listen: false).destination}'),
-              const SizedBox(height: 8),
-              Text('Date: ${_scheduledDateTime.day}/${_scheduledDateTime.month}/${_scheduledDateTime.year}'),
-              Text('Time: ${_scheduledDateTime.hour.toString().padLeft(2, '0')}:${_scheduledDateTime.minute.toString().padLeft(2, '0')}'),
-              const SizedBox(height: 16),
-              const Text(
-                'Your ride will be confirmed 30 minutes before the scheduled time.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ride scheduled successfully!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                // Navigate to booking screen
-                Navigator.pushNamed(context, BookRideScreen.id);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('Confirm'),
-            ),
-          ],
-        );
-      },
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    // Navigate directly to the trip creation screen without checking driver availability
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => TripCreationScreen(
+        pickupLocation: locationProvider.pickupLocation,
+        destination: locationProvider.destination,
+        pickupLat: locationProvider.pickupLat ?? 0.0,
+        pickupLng: locationProvider.pickupLng ?? 0.0,
+        destinationLat: locationProvider.destinationLat ?? 0.0,
+        destinationLng: locationProvider.destinationLng ?? 0.0,
+        isCurrentRide: _isCurrentRide,
+      )),
     );
   }
   
@@ -653,35 +572,6 @@ class _SimpleRideTabState extends State<SimpleRideTab> {
                         ),
                       ),
                     
-                    const SizedBox(height: 24),
-                    
-                    // Search buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _showLocationSearchDialog(context, locationProvider, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Set Start Location'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _showLocationSearchDialog(context, locationProvider, false),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Set Destination'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
                     const SizedBox(height: 16),
                     
                     // Book Ride Button
@@ -831,144 +721,6 @@ class _SimpleRideTabState extends State<SimpleRideTab> {
           ],
         ),
       ),
-    );
-  }
-
-  void _showLocationSearchDialog(BuildContext context, LocationProvider locationProvider, bool isStartLocation) {
-    final TextEditingController searchController = TextEditingController();
-    
-    // Set initial text if location is already selected
-    if (isStartLocation && locationProvider.pickupLocation.isNotEmpty) {
-      searchController.text = locationProvider.pickupLocation;
-    } else if (!isStartLocation && locationProvider.destination.isNotEmpty) {
-      searchController.text = locationProvider.destination;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(isStartLocation ? 'Set Start Location' : 'Set Destination'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search for places...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onChanged: (value) async {
-                        if (value.length > 2) {
-                          try {
-                            await locationProvider.searchLocations(value, forDestination: !isStartLocation);
-                            
-                            setState(() {
-                              _suggestions = locationProvider.predictions;
-                              _showSuggestions = _suggestions.isNotEmpty;
-                            });
-                          } catch (e) {
-                            print('Error searching locations: $e');
-                            setState(() {
-                              _suggestions = [];
-                              _showSuggestions = false;
-                            });
-                          }
-                        } else {
-                          setState(() {
-                            _suggestions = [];
-                            _showSuggestions = false;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _showSuggestions && _suggestions.isNotEmpty
-                          ? ListView.builder(
-                              itemCount: _suggestions.length,
-                              itemBuilder: (context, index) {
-                                final result = _suggestions[index];
-                                return ListTile(
-                                  leading: Icon(
-                                    isStartLocation ? Icons.my_location : Icons.location_pin,
-                                    color: isStartLocation ? Colors.blue : Colors.green,
-                                  ),
-                                  title: Text(
-                                    result.description,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                  subtitle: result.secondaryText != null 
-                                      ? Text(
-                                          result.secondaryText!,
-                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                        )
-                                      : null,
-                                  onTap: () async {
-                                    try {
-                                      // Select the location using the provider
-                                      await locationProvider.selectLocation(result);
-                                      
-                                      Navigator.pop(context);
-                                      
-                                      // Show confirmation
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              isStartLocation 
-                                                  ? 'Pickup location set to: ${locationProvider.pickupLocation}'
-                                                  : 'Destination set to: ${locationProvider.destination}',
-                                            ),
-                                            duration: const Duration(seconds: 2),
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      print('Error selecting location: $e');
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Error selecting location: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                );
-                              },
-                            )
-                          : const Center(
-                              child: Text(
-                                'Start typing to search for locations...',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 

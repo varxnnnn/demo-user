@@ -16,6 +16,8 @@ class Driver {
   final String? onlineStatus;
   final VehicleCapacity? vehicleCapacity;
   final Vehicle? vehicle;
+  final double? locationLatitude;
+  final double? locationLongitude;
 
   Driver({
     required this.id,
@@ -31,6 +33,8 @@ class Driver {
     this.onlineStatus,
     this.vehicleCapacity,
     this.vehicle,
+    this.locationLatitude,
+    this.locationLongitude,
   });
 
   Map<String, dynamic> toJson() {
@@ -48,6 +52,10 @@ class Driver {
       'onlineStatus': onlineStatus,
       if (vehicleCapacity != null) 'vehicleCapacity': vehicleCapacity!.toJson(),
       if (vehicle != null) 'vehicle': vehicle!.toJson(),
+      'location': {
+        'latitude': locationLatitude,
+        'longitude': locationLongitude,
+      },
     };
   }
 
@@ -70,6 +78,12 @@ class Driver {
       vehicle: json['vehicle'] != null 
           ? Vehicle.fromJson(json['vehicle']) 
           : null,
+      locationLatitude: json['location'] != null 
+          ? (json['location']['latitude'] as num?)?.toDouble() 
+          : null,
+      locationLongitude: json['location'] != null 
+          ? (json['location']['longitude'] as num?)?.toDouble() 
+          : null,
     );
   }
 
@@ -78,7 +92,7 @@ class Driver {
     try {
       // Get driver data
       DocumentSnapshot driverSnapshot = await firestore.collection('drivers').doc(driverId).get();
-      if (!driverSnapshot.exists) return null!;
+      if (!driverSnapshot.exists) throw Exception('Driver not found');
       
       Map<String, dynamic> driverData = driverSnapshot.data() as Map<String, dynamic>;
       
@@ -93,10 +107,15 @@ class Driver {
         driverData['vehicle'] = vehicleSnapshot.docs.first.data();
       }
       
+      // Ensure location data is available
+      if (driverData['location'] != null) {
+        driverData['locationLatitude'] = (driverData['location']['latitude'] as num?)?.toDouble();
+        driverData['locationLongitude'] = (driverData['location']['longitude'] as num?)?.toDouble();
+      }
+      
       return Driver.fromJson(driverData);
     } catch (e) {
-      print('Error loading driver with vehicle: $e');
-      return null!;
+      throw Exception('Error loading driver with vehicle: $e');
     }
   }
 }

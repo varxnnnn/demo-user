@@ -36,7 +36,6 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final locationProvider = Provider.of<LocationProvider>(context);
     
     return Scaffold(
       appBar: AppBar(
@@ -379,9 +378,6 @@ class _MapScreenState extends State<MapScreen> {
       final southwestLng = [_sourceLocation!.longitude, _destinationLocation!.longitude].reduce((a, b) => a < b ? a : b);
       final northeastLat = [_sourceLocation!.latitude, _destinationLocation!.latitude].reduce((a, b) => a > b ? a : b);
       final northeastLng = [_sourceLocation!.longitude, _destinationLocation!.longitude].reduce((a, b) => a > b ? a : b);
-      
-      final southwest = LatLng(southwestLat, southwestLng);
-      final northeast = LatLng(northeastLat, northeastLng);
       
       // Create camera position that fits both points
       final latSpan = northeastLat - southwestLat;

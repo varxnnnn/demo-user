@@ -237,7 +237,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${vehicle?.brand?.toUpperCase() ?? 'UNKNOWN'} ${vehicle?.model?.toUpperCase() ?? ''}',
+                            vehicle != null ? '${vehicle.brand.toUpperCase()} ${vehicle.model.toUpperCase()}' : 'Vehicle Info',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -819,7 +819,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(6),
                       child: CachedNetworkImage(
-                        imageUrl: vehicle!.vehicleImageUrl,
+                        imageUrl: vehicle.vehicleImageUrl,
                         fit: BoxFit.cover,
                         errorWidget: (context, url, error) => Container(
                           color: Colors.grey[200],
@@ -859,7 +859,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
             if (vehicle?.rcBookUrl != null && vehicle!.rcBookUrl.isNotEmpty)
               TextButton(
                 onPressed: () {
-                  _showRcBook(vehicle!.rcBookUrl);
+                  _showRcBook(vehicle.rcBookUrl);
                 },
                 child: const Text('View RC Book'),
               ),

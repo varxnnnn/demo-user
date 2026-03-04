@@ -1,14 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../providers/location_provider.dart';
+import '../providers/user_provider.dart';
+import '../providers/trips_provider.dart';
 import '../models/trip_model.dart';
-import 'map_selection_screen.dart';
+import 'searching_for_driver_screen.dart';
 
 class TripCreationScreen extends StatefulWidget {
   static const String id = 'trip_creation_screen';
   
-  const TripCreationScreen({Key? key}) : super(key: key);
+  final String pickupLocation;
+  final String destination;
+  final double pickupLat;
+  final double pickupLng;
+  final double destinationLat;
+  final double destinationLng;
+  final bool isCurrentRide;
+  
+  const TripCreationScreen({
+    Key? key,
+    required this.pickupLocation,
+    required this.destination,
+    required this.pickupLat,
+    required this.pickupLng,
+    required this.destinationLat,
+    required this.destinationLng,
+    this.isCurrentRide = true,
+  }) : super(key: key);
 
   @override
   State<TripCreationScreen> createState() => _TripCreationScreenState();
@@ -39,6 +57,34 @@ class _TripCreationScreenState extends State<TripCreationScreen> {
     _specialInstructionsController.dispose();
     _passengerCountController.dispose();
     super.dispose();
+  }
+  
+  @override
+  void initState() {
+    super.initState();
+    // Set up the locations in the provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      
+      // Create Location models from widget parameters
+      final pickupLocation = Location(
+        latitude: widget.pickupLat,
+        longitude: widget.pickupLng,
+        formattedAddress: widget.pickupLocation,
+        placeId: 'pickup_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      
+      final dropoffLocation = Location(
+        latitude: widget.destinationLat,
+        longitude: widget.destinationLng,
+        formattedAddress: widget.destination,
+        placeId: 'dropoff_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      
+      // Set both model-based and legacy location fields
+      locationProvider.setPickupLocationModel(pickupLocation);
+      locationProvider.setDropoffLocationModel(dropoffLocation);
+    });
   }
 
   @override
@@ -97,107 +143,90 @@ class _TripCreationScreenState extends State<TripCreationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Locations',
+              'Trip Route',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             
             // Pickup Location
-            _buildLocationSelector(
-              context: context,
-              locationProvider: locationProvider,
-              isPickup: true,
-              location: locationProvider.pickupLocationModel,
-              onTap: () => _selectLocation(context, locationProvider, true),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.my_location,
+                  color: Colors.blue,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pickup',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.pickupLocation,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            const SizedBox(height: 16),
-            
-            const Icon(Icons.arrow_downward, color: Colors.grey),
-            
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 11.0),
+              child: Container(
+                width: 2,
+                height: 20,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 12),
             
             // Dropoff Location
-            _buildLocationSelector(
-              context: context,
-              locationProvider: locationProvider,
-              isPickup: false,
-              location: locationProvider.dropoffLocationModel,
-              onTap: () => _selectLocation(context, locationProvider, false),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // View on Map Button
-            if (locationProvider.pickupLocationModel != null && 
-                locationProvider.dropoffLocationModel != null)
-              ElevatedButton.icon(
-                onPressed: () => _viewRouteOnMap(context, locationProvider),
-                icon: const Icon(Icons.map),
-                label: const Text('View Route on Map'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.location_pin,
+                  color: Colors.green,
+                  size: 24,
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationSelector({
-    required BuildContext context,
-    required LocationProvider locationProvider,
-    required bool isPickup,
-    Location? location,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isPickup ? Colors.blue : Colors.green,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(8),
-          color: location != null ? Colors.grey[50] : Colors.white,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isPickup ? Icons.my_location : Icons.location_pin,
-              color: isPickup ? Colors.blue : Colors.green,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isPickup ? 'Pickup Location' : 'Dropoff Location',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isPickup ? Colors.blue : Colors.green,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dropoff',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.destination,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    location?.formattedAddress ?? 
-                        (isPickup ? 'Tap to select pickup' : 'Tap to select destination'),
-                    style: const TextStyle(fontSize: 14),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.edit,
-              color: location != null ? Colors.grey : 
-                    (isPickup ? Colors.blue : Colors.green),
+                ),
+              ],
             ),
           ],
         ),
@@ -526,41 +555,125 @@ class _TripCreationScreenState extends State<TripCreationScreen> {
     );
   }
 
-  void _selectLocation(BuildContext context, LocationProvider locationProvider, bool isPickup) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MapSelectionScreen(
-          isPickup: isPickup,
-          initialLocation: isPickup 
-              ? locationProvider.pickupLocationModel 
-              : locationProvider.dropoffLocationModel,
-        ),
-      ),
-    );
-  }
-
-  void _viewRouteOnMap(BuildContext context, LocationProvider locationProvider) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MapSelectionScreen(
-          isPickup: false, // Just to show the route
-          initialLocation: locationProvider.pickupLocationModel,
-          destinationLocation: locationProvider.dropoffLocationModel,
-        ),
-      ),
-    );
-  }
-
-  void _validateAndSubmit() {
+  void _validateAndSubmit() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement trip creation logic
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trip created successfully!')),
-      );
-      Navigator.pop(context);
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final tripsProvider = Provider.of<TripsProvider>(context, listen: false);
+
+      // Validate user
+      if (userProvider.user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
+      }
+
+      try {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Create TransportDetails based on trip type
+        TransportDetails transportDetails;
+        
+        if (_selectedTripType == TripType.objectTransport) {
+          transportDetails = TransportDetails(
+            objectType: _selectedObjectType,
+            objectDescription: _objectDescriptionController.text,
+            weight: _weightController.text.isEmpty 
+                ? null 
+                : double.tryParse(_weightController.text),
+            length: _dimensionsController.text.isEmpty 
+                ? null 
+                : _parseDimension(_dimensionsController.text, 0),
+            width: _dimensionsController.text.isEmpty 
+                ? null 
+                : _parseDimension(_dimensionsController.text, 1),
+            height: _dimensionsController.text.isEmpty 
+                ? null 
+                : _parseDimension(_dimensionsController.text, 2),
+            isFragile: _isFragile,
+            specialInstructions: _specialInstructionsController.text,
+          );
+        } else {
+          transportDetails = TransportDetails(
+            numberOfPassengers: _passengerCount,
+            passengerNames: _passengerNames.where((name) => name.isNotEmpty).toList(),
+          );
+        }
+
+        // Calculate distance and estimated duration
+        double distance = locationProvider.distanceValue > 0 
+            ? locationProvider.distanceValue / 1000.0 
+            : 5.0; // Default 5 km if not calculated
+        
+        int estimatedDuration = locationProvider.durationValue > 0 
+            ? (locationProvider.durationValue / 60).round() 
+            : 15; // Default 15 minutes
+
+        // Calculate fare (simple formula: base + per km)
+        double fare = 50.0 + (distance * 15.0); // Base 50 + 15 per km
+
+        // Create the trip
+        final tripId = await tripsProvider.createTrip(
+          userId: userProvider.user!.uid,
+          userName: userProvider.user!.name,
+          pickupLocation: locationProvider.pickupLocationModel!,
+          dropoffLocation: locationProvider.dropoffLocationModel!,
+          tripType: _selectedTripType,
+          transportDetails: transportDetails,
+          distance: distance,
+          estimatedDuration: estimatedDuration,
+          fare: fare,
+        );
+
+        // Close loading dialog
+        Navigator.pop(context);
+
+        if (tripId != null) {
+          if (widget.isCurrentRide) {
+            // For current ride, navigate to searching for driver screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const SearchingForDriverScreen()),
+            );
+          } else {
+            // For scheduled ride, show success and go back
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Trip created successfully!')),
+            );
+            Navigator.pop(context);
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to create trip: ${tripsProvider.error}')),
+          );
+        }
+      } catch (e) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating trip: $e')),
+        );
+      }
     }
+  }
+
+  double? _parseDimension(String dimensions, int index) {
+    try {
+      final parts = dimensions.split('×');
+      if (parts.length > index) {
+        return double.tryParse(parts[index].trim());
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
   }
 
   String _getTripTypeName(TripType type) {

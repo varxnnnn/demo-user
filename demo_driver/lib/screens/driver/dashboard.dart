@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'home.dart';  // This will be the main screen with online/offline functionality
-import 'vehicle_capacity_screen.dart';
 import 'vehicle_details_screen.dart';
 import '../../services/auth_service.dart';
 import '../../models/driver.dart';

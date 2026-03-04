@@ -33,7 +33,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
   void initState() {
     super.initState();
     if (widget.initialLocation != null) {
-      _searchController.text = widget.initialLocation!.formattedAddress ?? '';
+      _searchController.text = widget.initialLocation!.formattedAddress;
     }
   }
 
@@ -208,7 +208,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
         id: widget.isPickup ? 'pickup' : 'dropoff',
         position: LatLng(widget.initialLocation!.latitude, widget.initialLocation!.longitude),
         title: widget.isPickup ? 'Current Pickup' : 'Current Drop-off',
-        snippet: widget.initialLocation!.formattedAddress ?? '',
+        snippet: widget.initialLocation!.formattedAddress,
         color: widget.isPickup ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
       );
     }
@@ -218,7 +218,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
         id: 'destination',
         position: LatLng(widget.destinationLocation!.latitude, widget.destinationLocation!.longitude),
         title: 'Destination',
-        snippet: widget.destinationLocation!.formattedAddress ?? '',
+        snippet: widget.destinationLocation!.formattedAddress,
         color: BitmapDescriptor.hueRed,
       );
       
@@ -320,7 +320,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
             id: 'destination',
             position: LatLng(widget.destinationLocation!.latitude, widget.destinationLocation!.longitude),
             title: 'Destination',
-            snippet: widget.destinationLocation!.formattedAddress ?? '',
+            snippet: widget.destinationLocation!.formattedAddress,
             color: BitmapDescriptor.hueRed,
           );
         }
