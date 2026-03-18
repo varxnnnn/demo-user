@@ -24,7 +24,7 @@ class TripService {
           .get();
       
       return snapshot.docs
-          .map((doc) => Trip.fromJson(doc.data() as Map<String, dynamic>))
+          .map((doc) => Trip.fromJson(doc.data() as Map<String, dynamic>, id: doc.id))
           .toList();
     } catch (e) {
       return [];
@@ -39,7 +39,7 @@ class TripService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .map((doc) => Trip.fromJson(doc.data()))
+          .map((doc) => Trip.fromJson(doc.data() as Map<String, dynamic>, id: doc.id))
           .toList();
     });
   }

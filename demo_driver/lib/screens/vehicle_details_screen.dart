@@ -134,6 +134,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                  errorMessage.contains('connection') ||
                  errorMessage.contains('timeout')) {
         throw Exception('Network error. Please check your internet connection and try again.');
+      } else if (errorMessage.contains('402') || 
+                 errorMessage.contains('payment') || 
+                 errorMessage.contains('blaze')) {
+        throw Exception('Firebase Storage requires a Blaze plan. Please upgrade your Firebase project to the pay-as-you-go (Blaze) plan to enable image uploads.');
       } else {
         throw Exception('Upload failed: \$e');
       }
@@ -142,32 +146,18 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
 
   Future<void> _submitVehicleDetails() async {
     if (_formKey.currentState!.validate()) {
-      if (_vehicleImage == null || _rcBookImage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please upload both vehicle and RC book images'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
       setState(() => _isLoading = true);
 
       try {
-        // Upload images
-        String? vehicleImageUrl;
-        String? rcBookImageUrl;
+        // Upload images (now optional)
+        String vehicleImageUrl = '';
+        String rcBookImageUrl = '';
         
         if (_vehicleImage != null) {
-          vehicleImageUrl = await _uploadImage(_vehicleImage!, 'vehicle_images');
+          vehicleImageUrl = await _uploadImage(_vehicleImage!, 'vehicle_images') ?? '';
         }
         if (_rcBookImage != null) {
-          rcBookImageUrl = await _uploadImage(_rcBookImage!, 'rc_books');
-        }
-
-        if (vehicleImageUrl == null || rcBookImageUrl == null) {
-          throw Exception('Failed to upload images. Please check your internet connection and try again.');
+          rcBookImageUrl = await _uploadImage(_rcBookImage!, 'rc_books') ?? '';
         }
 
         // Create vehicle object

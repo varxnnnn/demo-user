@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserRideRequest {
   final String id;
   final String userId;
@@ -38,9 +40,17 @@ class UserRideRequest {
   });
 
   // Create a ride request from a Map
-  factory UserRideRequest.fromJson(Map<String, dynamic> json) {
+  factory UserRideRequest.fromJson(Map<String, dynamic> json, {String? id}) {
+    DateTime? _parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      return null;
+    }
+
     return UserRideRequest(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       userId: json['userId'] ?? '',
       userName: json['userName'] ?? 'Unknown User',
       userRating: (json['userRating'] ?? 0.0).toDouble(),
@@ -49,9 +59,7 @@ class UserRideRequest {
       distance: (json['distance'] ?? 0.0).toDouble(),
       offeredPrice: (json['offeredPrice'] ?? 0.0).toDouble(),
       urgency: json['urgency'] ?? 'medium',
-      requestedAt: json['requestedAt'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch(json['requestedAt'])
-          : DateTime.now(),
+      requestedAt: _parseDateTime(json['requestedAt']) ?? DateTime.now(),
       status: json['status'] ?? 'pending',
       driverId: json['driverId'],
       negotiatedPrice: json['negotiatedPrice']?.toDouble(),

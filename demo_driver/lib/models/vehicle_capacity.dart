@@ -31,10 +31,10 @@ class VehicleCapacity {
 
   factory VehicleCapacity.fromJson(Map<String, dynamic> json) {
     return VehicleCapacity(
-      totalSeats: json['totalSeats'] ?? 0,
-      totalCargoKg: json['totalCargoKg'] ?? 0,
-      availableSeats: json['availableSeats'] ?? 0,
-      availableCargoKg: json['availableCargoKg'] ?? 0,
+      totalSeats: (json['totalSeats'] as num?)?.toInt() ?? 0,
+      totalCargoKg: (json['totalCargoKg'] as num?)?.toInt() ?? 0,
+      availableSeats: (json['availableSeats'] as num?)?.toInt() ?? 0,
+      availableCargoKg: (json['availableCargoKg'] as num?)?.toInt() ?? 0,
     );
   }
 

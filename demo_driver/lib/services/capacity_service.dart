@@ -76,13 +76,20 @@ class CapacityService {
     } else if (request.type == 'cargo') {
       // Check if it was using cargo space or seats
       if (request.cargoWeight > 0 && request.cargoType != 'document') {
-        // If it was using cargo space
-        if (currentCapacity.totalCargoKg - currentCapacity.availableCargoKg >= request.cargoWeight) {
-          newAvailableCargoKg += request.cargoWeight.toInt();
-        } else if (request.canUseSeats) {
-          // If it was using seats for cargo
-          int seatsUsed = (request.cargoWeight / 5).ceil();
-          newAvailableSeats += seatsUsed;
+        // Logic: We don't know for sure if it took up cargo space or seats (unless we stored that state).
+        // But we should prioritize restoring cargo space first.
+        
+        // 1. Try to add back to cargo space
+        newAvailableCargoKg += request.cargoWeight.toInt();
+        
+        // 2. If adding to cargo exceeds total cargo capacity, it means some (or all) of it was using seats.
+        if (newAvailableCargoKg > currentCapacity.totalCargoKg) {
+          int overflow = newAvailableCargoKg - currentCapacity.totalCargoKg;
+          newAvailableCargoKg = currentCapacity.totalCargoKg; // Cap cargo at max
+          
+          // Convert overflow back to seats (assuming 5kg per seat ratio used in booking)
+          int seatsToRestore = (overflow / 5).ceil();
+          newAvailableSeats += seatsToRestore;
         }
       }
     }

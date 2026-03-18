@@ -21,34 +21,35 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDriverData();
+    _loadDriverAndVehicleData();
   }
 
-  Future<void> _loadDriverData() async {
+  Future<void> _loadDriverAndVehicleData() async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final currentUser = authService.currentUser;
       
       if (currentUser != null) {
+        // First, get the main driver data
         final driverData = await authService.getDriverData(currentUser.uid);
         
-        // If driver doesn't have vehicle data but has capacity, create vehicle data
-        if (driverData != null && 
-            driverData.vehicle == null && 
-            driverData.vehicleCapacity != null) {
-          await _createVehicleForDriver(currentUser.uid, driverData);
-          // Reload data after creating vehicle
-          final updatedDriverData = await authService.getDriverData(currentUser.uid);
+        if (driverData != null) {
+          // Next, fetch the vehicle data from the sub-collection
+          final vehicleService = Provider.of<VehicleService>(context, listen: false);
+          final vehicleData = await vehicleService.getVehicleByDriverId(currentUser.uid);
+          
+          // Assign the fetched vehicle to the driver object
+          driverData.vehicle = vehicleData;
+          
           if (mounted) {
             setState(() {
-              _driver = updatedDriverData;
+              _driver = driverData;
               _isLoading = false;
             });
           }
         } else {
           if (mounted) {
             setState(() {
-              _driver = driverData;
               _isLoading = false;
             });
           }
@@ -69,30 +70,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     }
   }
 
-  Future<void> _createVehicleForDriver(String driverId, Driver driverData) async {
-    try {
-      final vehicleService = Provider.of<VehicleService>(context, listen: false);
-      
-      // Create vehicle data from driver info
-      final vehicle = Vehicle(
-        id: '${driverId}_${DateTime.now().millisecondsSinceEpoch}',
-        driverId: driverId,
-        vehicleType: 'Car',
-        brand: 'Unknown',
-        model: 'Unknown',
-        registrationNumber: 'Unknown',
-        rcBookUrl: '',
-        vehicleImageUrl: '',
-        isVerified: false,
-        createdAt: DateTime.now(),
-      );
-      
-      await vehicleService.addVehicle(vehicle);
-      print('Created default vehicle data for driver: $driverId');
-    } catch (e) {
-      print('Error creating vehicle data: $e');
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +86,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6A1B9A)),
               ),
             )
-          : _driver?.vehicleCapacity == null
+          : _driver?.vehicle == null
               ? _buildNoVehicleData()
               : _buildVehicleDetails(),
     );

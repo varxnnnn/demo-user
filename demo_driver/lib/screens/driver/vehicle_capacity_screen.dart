@@ -26,10 +26,12 @@ class _VehicleCapacityScreenState extends State<VehicleCapacityScreen> {
   }
 
   Future<void> _loadDriverId() async {
-    // In a real app, you would get the driver ID from auth provider
-    setState(() {
-      _driverId = 'driver_123'; // This would come from auth provider
-    });
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (authService.currentUser != null) {
+      setState(() {
+        _driverId = authService.currentUser!.uid;
+      });
+    }
   }
 
   Future<void> _loadExistingData() async {
@@ -119,6 +121,36 @@ class _VehicleCapacityScreenState extends State<VehicleCapacityScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _resetCapacity() async {
+    if (_driverId == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final capacityProvider = Provider.of<CapacityProvider>(context, listen: false);
+      await capacityProvider.resetCapacity(
+        int.parse(_seatsController.text),
+        int.parse(_cargoController.text),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Available capacity has been reset to match total capacity.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error resetting capacity: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -235,6 +267,23 @@ class _VehicleCapacityScreenState extends State<VehicleCapacityScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              
+              // Reset Capacity Button (for debugging)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _resetCapacity,
+                  icon: const Icon(Icons.refresh, color: Colors.orange),
+                  label: const Text(
+                    'Reset Available Capacity',
+                    style: TextStyle(color: Colors.orange),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.orange),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               
               // Save Button
               SizedBox(

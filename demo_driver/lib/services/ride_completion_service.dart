@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/ride_completion.dart';
+import '../models/vehicle_capacity.dart';
+import 'capacity_service.dart';
 
 class RideCompletionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CapacityService _capacityService = CapacityService();
 
   /// Complete a ride and record completion details
   Future<void> completeRide({
@@ -10,18 +13,129 @@ class RideCompletionService {
     required RideCompletionDetails completionDetails,
   }) async {
     try {
-      // Update trip document with completion data
+      // 1. Update trip document with completion data
       await _firestore.collection('trips').doc(tripId).update({
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
         'completion': completionDetails.toJson(),
       });
 
-      // Record receipt
+      // 2. Free up capacity for the driver
+      await _freeUpCapacity(completionDetails.driverId, tripId);
+
+      // 3. Record receipt
       await _recordReceipt(tripId, completionDetails);
+
+      // 4. Record earnings and update driver wallet
+      await _recordEarning(completionDetails);
+
+      // 5. Add to driver's completed trips history
+      await _recordCompletedTrip(completionDetails);
     } catch (e) {
       print('Error completing ride: $e');
       rethrow;
+    }
+  }
+
+  /// Free up capacity after a ride is completed
+  Future<void> _freeUpCapacity(String driverId, String tripId) async {
+    try {
+      print('[CapacityRestoration] Starting for driverId=$driverId, tripId=$tripId');
+      
+      // Get the trip to find what capacity was used
+      final tripDoc = await _firestore.collection('trips').doc(tripId).get();
+      if (!tripDoc.exists) {
+        print('[CapacityRestoration] Trip document not found');
+        return;
+      }
+      
+      final tripData = tripDoc.data() as Map<String, dynamic>;
+       
+       // Get booking details from the trip
+       // Support both formats: direct fields and nested transportDetails
+       String type = 'passenger';
+       if (tripData['tripType'] == 'objectTransport' || tripData['type'] == 'cargo') {
+         type = 'cargo';
+       }
+
+       int passengerCount = 0;
+       double cargoWeight = 0.0;
+
+       if (type == 'passenger') {
+         passengerCount = (tripData['passengerCount'] as num?)?.toInt() ?? 
+                         (tripData['transportDetails']?['numberOfPassengers'] as num?)?.toInt() ?? 1;
+       } else {
+         cargoWeight = (tripData['cargoWeight'] as num?)?.toDouble() ?? 
+                      (tripData['transportDetails']?['weight'] as num?)?.toDouble() ?? 0.0;
+       }
+       
+       // Create a BookingRequest representation to use with CapacityService
+       final bookingRequest = BookingRequest(
+         id: tripId,
+         type: type,
+         passengerCount: passengerCount,
+         cargoWeight: cargoWeight,
+         pickupLocation: tripData['pickupLocation'] is Map 
+             ? (tripData['pickupLocation']['formattedAddress'] ?? '') 
+             : (tripData['pickupLocation'] ?? ''),
+         destination: tripData['dropoffLocation'] is Map 
+             ? (tripData['dropoffLocation']['formattedAddress'] ?? '') 
+             : (tripData['dropoffLocation'] ?? ''),
+         timestamp: DateTime.now(),
+       );
+
+      // Get current driver capacity
+      final driverDoc = await _firestore.collection('drivers').doc(driverId).get();
+      if (!driverDoc.exists) {
+        print('[CapacityRestoration] Driver document not found');
+        return;
+      }
+      
+      final driverData = driverDoc.data() as Map<String, dynamic>;
+      final capacityData = driverData['vehicleCapacity'];
+      
+      if (capacityData != null) {
+        final currentCapacity = VehicleCapacity.fromJson(capacityData as Map<String, dynamic>);
+        
+        // Use CapacityService to calculate new capacity
+        final updatedCapacity = _capacityService.updateCapacityAfterCompletion(
+          currentCapacity, 
+          bookingRequest
+        );
+        
+        print('[CapacityRestoration] Updating capacity: \${currentCapacity.availableSeats} -> \${updatedCapacity.availableSeats} seats');
+
+        // Update driver document
+        await _firestore.collection('drivers').doc(driverId).update({
+          'vehicleCapacity': updatedCapacity.toJson(),
+        });
+        
+        // Also update the vehicle document if it exists
+        final vehicleSnapshot = await _firestore
+            .collection('vehicles')
+            .where('driverId', isEqualTo: driverId)
+            .limit(1)
+            .get();
+            
+        if (vehicleSnapshot.docs.isNotEmpty) {
+          final vehicleId = vehicleSnapshot.docs.first.id;
+          await _firestore.collection('vehicles').doc(vehicleId).update({
+            'vehicleCapacity': updatedCapacity.toJson(),
+          });
+        }
+      }
+      
+      // Remove from activeTrips sub-collection
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('activeTrips')
+          .doc(tripId)
+          .delete();
+          
+      print('[CapacityRestoration] Successfully completed');
+    } catch (e) {
+      print('[CapacityRestoration] Error: $e');
     }
   }
 
@@ -45,6 +159,63 @@ class RideCompletionService {
       });
     } catch (e) {
       print('Error recording receipt: $e');
+    }
+  }
+
+  /// Record driver earning and update wallet balance
+  Future<void> _recordEarning(RideCompletionDetails details) async {
+    try {
+      final driverId = details.driverId;
+      final amount = details.totalFare;
+
+      // 1. Add to driver's earnings sub-collection
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('earnings')
+          .add({
+        'tripId': details.tripId,
+        'amount': amount,
+        'paymentMethod': details.paymentMethod,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 2. Update driver's total wallet balance
+      await _firestore.collection('drivers').doc(driverId).update({
+        'wallet': FieldValue.increment(amount),
+        'lastEarningsUpdate': FieldValue.serverTimestamp(),
+      });
+      
+      print('[Earnings] Recorded ₹$amount for driver $driverId');
+    } catch (e) {
+      print('Error recording earning: $e');
+    }
+  }
+
+  /// Record completed trip in driver's history
+  Future<void> _recordCompletedTrip(RideCompletionDetails details) async {
+    try {
+      final tripDoc = await _firestore.collection('trips').doc(details.tripId).get();
+      if (!tripDoc.exists) return;
+      
+      final tripData = tripDoc.data() as Map<String, dynamic>;
+      
+      // Add to driver's completedTrips sub-collection
+      await _firestore
+          .collection('drivers')
+          .doc(details.driverId)
+          .collection('completedTrips')
+          .doc(details.tripId)
+          .set({
+        ...tripData,
+        'status': 'completed',
+        'completedAt': details.completedAt.millisecondsSinceEpoch,
+        'fare': details.totalFare, // Use final fare from completion details
+      });
+      
+      print('[History] Added trip \${details.tripId} to driver history');
+    } catch (e) {
+      print('Error recording completed trip: $e');
     }
   }
 

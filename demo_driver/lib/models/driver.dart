@@ -15,7 +15,7 @@ class Driver {
   final DateTime createdAt;
   final String? onlineStatus;
   final VehicleCapacity? vehicleCapacity;
-  final Vehicle? vehicle;
+  Vehicle? vehicle;
   final double? locationLatitude;
   final double? locationLongitude;
 
@@ -85,6 +85,11 @@ class Driver {
           ? (json['location']['longitude'] as num?)?.toDouble() 
           : null,
     );
+  }
+
+  factory Driver.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return Driver.fromJson(data);
   }
 
   // Static method to create Driver with vehicle data

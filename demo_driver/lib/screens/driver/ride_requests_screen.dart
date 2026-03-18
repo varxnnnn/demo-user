@@ -46,35 +46,12 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final driverName = authService.currentUser?.displayName ?? 'Driver';
       
-      // Update ride request status
+      // Accept ride request and create activeTrips entry
       await _rideRequestService.acceptRideRequest(
-        request.id,
+        request,
         _driverId!,
         driverName,
       );
-
-      // Add to driver's active trips in Firestore
-      await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(_driverId!)
-          .collection('activeTrips')
-          .doc(request.id)
-          .set({
-        'tripId': request.id,
-        'userId': request.userId,
-        'userName': request.userName,
-        'pickupLocation': request.pickupLocation,
-        'dropoffLocation': request.dropoffLocation,
-        'pickupLat': request.pickupLat ?? 0.0,
-        'pickupLng': request.pickupLng ?? 0.0,
-        'dropoffLat': request.dropoffLat ?? 0.0,
-        'dropoffLng': request.dropoffLng ?? 0.0,
-        'status': 'en_route', // Driver is heading to pickup
-        'acceptedAt': FieldValue.serverTimestamp(),
-        'userLatitude': request.pickupLat ?? 0.0, // Use the actual pickup location
-        'userLongitude': request.pickupLng ?? 0.0,
-        'offeredPrice': request.offeredPrice,
-      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

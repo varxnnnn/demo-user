@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Trip {
   final String id;
   final String userId;
@@ -74,42 +76,38 @@ class Trip {
     };
   }
 
-  factory Trip.fromJson(Map<String, dynamic> json) {
+  factory Trip.fromJson(Map<String, dynamic> json, {String? id}) {
+    DateTime? _parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      return null;
+    }
+
     return Trip(
-      id: json['id'],
-      userId: json['userId'],
-      userName: json['userName'],
-      pickupLocation: json['pickupLocation'],
-      dropoffLocation: json['dropoffLocation'],
-      pickupLat: json['pickupLat']?.toDouble() ?? 0.0,
-      pickupLng: json['pickupLng']?.toDouble() ?? 0.0,
-      dropoffLat: json['dropoffLat']?.toDouble() ?? 0.0,
-      dropoffLng: json['dropoffLng']?.toDouble() ?? 0.0,
-      fare: json['fare']?.toDouble() ?? 0.0,
+      id: id ?? json['id'] ?? '',
+      userId: json['userId'] ?? '',
+      userName: json['userName'] ?? '',
+      pickupLocation: json['pickupLocation'] ?? '',
+      dropoffLocation: json['dropoffLocation'] ?? '',
+      pickupLat: (json['pickupLat'] ?? 0.0).toDouble(),
+      pickupLng: (json['pickupLng'] ?? 0.0).toDouble(),
+      dropoffLat: (json['dropoffLat'] ?? 0.0).toDouble(),
+      dropoffLng: (json['dropoffLng'] ?? 0.0).toDouble(),
+      fare: (json['fare'] ?? 0.0).toDouble(),
       status: json['status'] ?? 'requested',
-      createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'])
-          : null,
+      createdAt: _parseDateTime(json['createdAt']),
       driverId: json['driverId'],
       driverName: json['driverName'],
       driverPhone: json['driverPhone'],
       vehicleNumber: json['vehicleNumber'],
       estimatedArrivalTime: json['estimatedArrivalTime'],
-      acceptedAt: json['acceptedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['acceptedAt'])
-          : null,
-      driverArrivedAt: json['driverArrivedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['driverArrivedAt'])
-          : null,
-      startedAt: json['startedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['startedAt'])
-          : null,
-      completedAt: json['completedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['completedAt'])
-          : null,
-      cancelledAt: json['cancelledAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['cancelledAt'])
-          : null,
+      acceptedAt: _parseDateTime(json['acceptedAt']),
+      driverArrivedAt: _parseDateTime(json['driverArrivedAt']),
+      startedAt: _parseDateTime(json['startedAt']),
+      completedAt: _parseDateTime(json['completedAt']),
+      cancelledAt: _parseDateTime(json['cancelledAt']),
     );
   }
 }

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'dart:math';
 import '../../services/auth_service.dart';
+import '../../models/vehicle_capacity.dart';
+import '../../services/capacity_service.dart';
+
 
 class VerificationEntryScreen extends StatefulWidget {
   final String tripId;
@@ -47,6 +52,8 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
         return;
       }
 
+      print('🔐 Verifying code: $enteredCode');
+
       // Get the trip document to check the verification code
       final tripDoc =
           await FirebaseFirestore.instance.collection('trips').doc(widget.tripId).get();
@@ -59,9 +66,19 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
         return;
       }
 
-      final tripData = tripDoc.data() as Map<String, dynamic>;
-      final verificationData =
-          tripData['verification'] as Map<String, dynamic>?;
+      final tripData = tripDoc.data() as Map<String, dynamic>?;
+      
+      if (tripData == null) {
+        setState(() {
+          _error = 'Trip data is empty';
+          _isVerifying = false;
+        });
+        return;
+      }
+
+      print('📄 Trip data retrieved successfully');
+
+      final verificationData = tripData['verification'];
 
       if (verificationData == null) {
         setState(() {
@@ -71,7 +88,22 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
         return;
       }
 
-      final correctCode = verificationData['code'] as String?;
+      print('🔒 Verification data: $verificationData');
+
+      // Handle verification data safely
+      String? correctCode;
+      bool isExpired = false;
+
+      if (verificationData is Map<String, dynamic>) {
+        correctCode = verificationData['code']?.toString().trim();
+        
+        // Check expiration
+        final expiresAt = verificationData['expiresAt'];
+        if (expiresAt != null && expiresAt is Timestamp) {
+          isExpired = expiresAt.toDate().isBefore(DateTime.now());
+          print('⏰ Code expired: $isExpired');
+        }
+      }
 
       if (correctCode == null) {
         setState(() {
@@ -81,6 +113,16 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
         return;
       }
 
+      if (isExpired) {
+        setState(() {
+          _error = 'Verification code has expired. Ask passenger for a new code.';
+          _isVerifying = false;
+        });
+        return;
+      }
+
+      print('📝 Entered: $enteredCode | Stored: $correctCode');
+
       if (enteredCode == correctCode) {
         // Code is correct! Update trip status
         final authService =
@@ -88,65 +130,61 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
         final driverId = authService.currentUser?.uid;
 
         if (driverId != null) {
-          // Update trip status to in_progress
-          await FirebaseFirestore.instance
-              .collection('trips')
-              .doc(widget.tripId)
-              .update({
-            'status': 'in_progress', // Ride started
-            'verifiedAt': FieldValue.serverTimestamp(),
-            'verification.status': 'verified',
-          });
-
-          // Update active trip status
-          await FirebaseFirestore.instance
-              .collection('drivers')
-              .doc(driverId)
-              .collection('activeTrips')
-              .doc(widget.tripId)
-              .update({
-            'status': 'arrived_at_pickup', // Driver has arrived
-            'verifiedAt': FieldValue.serverTimestamp(),
-          });
-
-          // Get driver's current vehicle capacity
-          final driverDoc =
-              await FirebaseFirestore.instance.collection('drivers').doc(driverId).get();
-          
-          if (driverDoc.exists) {
-            final driverData = driverDoc.data() as Map<String, dynamic>;
-            int currentCapacity = (driverData['vehicleCapacity'] ?? 4) as int;
+          try {
+            print('✅ Code verified correctly!');
             
-            // Reduce capacity by 1 (one passenger picked up)
-            int updatedCapacity = currentCapacity - 1;
-            
+            // Update trip status to in_progress
+            print('💾 Updating trip status to in_progress...');
+            await FirebaseFirestore.instance
+                .collection('trips')
+                .doc(widget.tripId)
+                .update({
+              'status': 'in_progress', // Ride started
+              'verifiedAt': FieldValue.serverTimestamp(),
+              'verification.status': 'verified',
+            });
+            print('✅ Trip status updated');
+
+            // Update active trip status
+            print('💾 Updating activeTrips status...');
             await FirebaseFirestore.instance
                 .collection('drivers')
                 .doc(driverId)
+                .collection('activeTrips')
+                .doc(widget.tripId)
                 .update({
-              'vehicleCapacity': updatedCapacity,
-              'lastCapacityUpdate': FieldValue.serverTimestamp(),
+              'status': 'in_progress', // Match the main trip status
+              'verifiedAt': FieldValue.serverTimestamp(),
             });
-          }
+            print('✅ ActiveTrips updated');
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Code verified! Ride in progress'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            setState(() {
-              _codeVerified = true;
-              _isVerifying = false;
-            });
-
-            // Return to previous screen after a short delay
-            await Future.delayed(const Duration(seconds: 1));
             if (mounted) {
-              Navigator.pop(context, true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Code verified! Ride in progress'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+
+              setState(() {
+                _codeVerified = true;
+                _isVerifying = false;
+              });
+
+              // Return to previous screen after a short delay
+              await Future.delayed(const Duration(seconds: 1));
+              if (mounted) {
+                Navigator.pop(context, true);
+              }
+            }
+          } catch (e) {
+            print('❌ Error in verification process: $e');
+            if (mounted) {
+              setState(() {
+                _error = 'Error: $e';
+                _isVerifying = false;
+              });
             }
           }
         }
@@ -371,4 +409,4 @@ class _VerificationEntryScreenState extends State<VerificationEntryScreen> {
   }
 }
 
-import 'package:provider/provider.dart';
+

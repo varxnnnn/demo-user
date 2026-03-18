@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'home.dart';  // This will be the main screen with online/offline functionality
+import '../login_screen.dart';
+import 'home.dart';
+import 'earnings_screen.dart';
+import 'completed_trips_screen.dart';
 import 'vehicle_details_screen.dart';
 import '../../services/auth_service.dart';
 import '../../models/driver.dart';
-import '../../screens/login_screen.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -26,8 +28,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _loadDriverData() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {
-      _driver = await authService.getDriverData(authService.currentUser!.uid);
-      setState(() {});
+      final driverData = await authService.getDriverData(authService.currentUser!.uid);
+      if (mounted) {
+        setState(() {
+          _driver = driverData;
+        });
+      }
     }
   }
 
@@ -92,11 +98,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('Earnings'),
               onTap: () {
                 Navigator.pop(context);
-                _onItemTapped(0);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => EarningsScreen()));
               },
             ),
             ListTile(
@@ -113,14 +119,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
               onTap: () {
                 Navigator.pop(context);
                 _onItemTapped(2);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet),
-              title: const Text('Earnings'),
-              onTap: () {
-                Navigator.pop(context);
-                _onItemTapped(3);
               },
             ),
             ListTile(
@@ -182,7 +180,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       case 1:
         return _buildVehicleScreen();
       case 2:
-        return _buildHistoryScreen();
+        return CompletedTripsScreen();
       case 3:
         return _buildEarningsScreen();
       case 4:
@@ -203,14 +201,142 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   Widget _buildEarningsScreen() {
-    return const Center(
-      child: Text('Earnings Screen'),
-    );
+    return const EarningsScreen();
   }
 
   Widget _buildSettingsScreen() {
-    return const Center(
-      child: Text('Settings Screen'),
+    if (_driver == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSettingsHeader(),
+          const SizedBox(height: 24),
+          _buildSettingsSection(
+            title: 'Personal Information',
+            items: [
+              _buildSettingsTile(Icons.person, 'Name', _driver!.name),
+              _buildSettingsTile(Icons.email, 'Email', _driver!.email),
+              _buildSettingsTile(Icons.phone, 'Phone', _driver!.phone),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSettingsSection(
+            title: 'Vehicle Information',
+            items: [
+              _buildSettingsTile(Icons.directions_car, 'Vehicle Type', _driver!.vehicle?.vehicleType ?? 'N/A'),
+              _buildSettingsTile(Icons.numbers, 'Plate Number', _driver!.vehicle?.registrationNumber ?? 'N/A'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSettingsSection(
+            title: 'Account',
+            items: [
+              _buildSettingsTile(Icons.star, 'Rating', '4.8'),
+              _buildSettingsTile(Icons.verified, 'Status', 'Verified', isGreen: true),
+            ],
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _confirmLogout(context),
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[50],
+                foregroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsHeader() {
+    return Center(
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 50,
+            backgroundColor: const Color(0xFF6A1B9A).withOpacity(0.1),
+            child: const Icon(
+              Icons.person,
+              size: 50,
+              color: Color(0xFF6A1B9A),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _driver!.name,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF311B92),
+            ),
+          ),
+          Text(
+            'Driver Partner',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsSection({required String title, required List<Widget> items}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
+          child: Column(children: items),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsTile(IconData icon, String label, String value, {bool isGreen = false}) {
+    return ListTile(
+      leading: Icon(icon, color: const Color(0xFF6A1B9A), size: 20),
+      title: Text(
+        label,
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+      ),
+      subtitle: Text(
+        value,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: isGreen ? Colors.green : Colors.black,
+        ),
+      ),
     );
   }
 
@@ -250,7 +376,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     
     // Navigate to login screen
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen()),
       (route) => false,
     );
   }

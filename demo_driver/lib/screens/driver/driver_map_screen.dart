@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +23,7 @@ class DriverMapScreen extends StatefulWidget {
 }
 
 class _DriverMapScreenState extends State<DriverMapScreen> {
-  late GoogleMapController _mapController;
+  GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   final LocationTrackingService _locationTrackingService =
@@ -32,6 +33,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   double? _distanceToUser;
   int? _etaMinutes;
   bool _isTracking = false;
+  bool _mapReady = false;
 
   @override
   void initState() {
@@ -42,7 +44,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   @override
   void dispose() {
-    _mapController.dispose();
+    if (_mapController != null) {
+      _mapController!.dispose();
+    }
     if (_isTracking) {
       _locationTrackingService.stopDriverLocationTracking();
     }
@@ -55,8 +59,35 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   }
 
   void _initializeMap() {
-    // Note: Pickup and dropoff locations are stored as strings in the Trip model
-    // They will be added to the map once the driver's location is available
+    // Add pickup and dropoff points from trip coordinates immediately
+    _markers.clear();
+    _addMarker(
+      markerId: 'pickup',
+      position: LatLng(widget.trip.pickupLat, widget.trip.pickupLng),
+      title: 'Pickup',
+      snippet: widget.trip.pickupLocation,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+    );
+    _addMarker(
+      markerId: 'dropoff',
+      position: LatLng(widget.trip.dropoffLat, widget.trip.dropoffLng),
+      title: 'Dropoff',
+      snippet: widget.trip.dropoffLocation,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    );
+
+    _polylines.clear();
+    _polylines.add(
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: [
+          LatLng(widget.trip.pickupLat, widget.trip.pickupLng),
+          LatLng(widget.trip.dropoffLat, widget.trip.dropoffLng),
+        ],
+        color: Colors.blue,
+        width: 5,
+      ),
+    );
   }
 
   void _startLocationTracking() {
@@ -118,9 +149,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     _updateDistanceAndETA(lat, lng);
 
     // Animate camera to show driver location
-    _mapController.animateCamera(
-      CameraUpdate.newLatLng(LatLng(lat, lng)),
-    );
+    if (_mapReady && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(LatLng(lat, lng)),
+      );
+    }
   }
 
   void _updateDistanceAndETA(double driverLat, double driverLng) {
@@ -150,10 +183,30 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           GoogleMap(
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
+              _mapReady = true;
+              _initializeMap();
+              if (widget.trip.pickupLat != 0 && widget.trip.pickupLng != 0) {
+                controller.animateCamera(
+                  CameraUpdate.newLatLngBounds(
+                    LatLngBounds(
+                      southwest: LatLng(
+                        math.min(widget.trip.pickupLat, widget.trip.dropoffLat),
+                        math.min(widget.trip.pickupLng, widget.trip.dropoffLng),
+                      ),
+                      northeast: LatLng(
+                        math.max(widget.trip.pickupLat, widget.trip.dropoffLat),
+                        math.max(widget.trip.pickupLng, widget.trip.dropoffLng),
+                      ),
+                    ),
+                    80,
+                  ),
+                );
+              }
             },
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(0, 0), // Will be updated based on driver location
-              zoom: 14,
+            initialCameraPosition: CameraPosition(
+              target: LatLng(widget.trip.pickupLat == 0 ? 0 : widget.trip.pickupLat,
+                  widget.trip.pickupLng == 0 ? 0 : widget.trip.pickupLng),
+              zoom: 12,
             ),
             markers: _markers,
             polylines: _polylines,
@@ -262,7 +315,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         CircleAvatar(
                           backgroundColor: Colors.blue,
                           child: Text(
-                            widget.trip.userName[0].toUpperCase(),
+                            widget.trip.userName.isNotEmpty
+                                ? widget.trip.userName[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -313,7 +368,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     onPressed: () {
                       // First, open verification entry screen when driver marks arrival
                       Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => VerificationEntryScreen(tripId: widget.trip.id),
+                        builder: (_) => VerificationEntryScreen(
+                          tripId: widget.trip.id,
+                          userName: widget.trip.userName,
+                          pickupLocation: widget.trip.pickupLocation,
+                        ),
                       )).then((result) {
                         if (result == true) {
                           // Once verified, navigate to ride completion screen
@@ -324,7 +383,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                           Navigator.of(context).pushReplacement(MaterialPageRoute(
                             builder: (_) => RideCompletionScreen(
                               tripId: widget.trip.id,
-                              driverId: widget.trip.driverId,
+                              driverId: widget.trip.driverId ?? '',
                               userId: widget.trip.userId,
                               userName: widget.trip.userName,
                               pickupLocation: widget.trip.pickupLocation,
